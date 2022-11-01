@@ -88,6 +88,7 @@ module RunoffMod
      real(r8), pointer :: runoffocn_nt2(:)
      real(r8), pointer :: runofftot_nt1(:)
      real(r8), pointer :: runofftot_nt2(:)
+     real(r8), pointer :: runofftot_nt3(:)
      real(r8), pointer :: runoffdir_nt1(:)
      real(r8), pointer :: runoffdir_nt2(:)
      real(r8), pointer :: dvolrdtlnd_nt1(:)
@@ -96,9 +97,11 @@ module RunoffMod
      real(r8), pointer :: dvolrdtocn_nt2(:)
      real(r8), pointer :: volr_nt1(:)
      real(r8), pointer :: volr_nt2(:)
+     real(r8), pointer :: volr_nt3(:)
      real(r8), pointer :: volr_mch(:)
      real(r8), pointer :: qsur_nt1(:)
      real(r8), pointer :: qsur_nt2(:)
+     real(r8), pointer :: qsur_nt3(:)
      real(r8), pointer :: qsub_nt1(:)
      real(r8), pointer :: qsub_nt2(:)
      real(r8), pointer :: qgwl_nt1(:)
@@ -310,10 +313,12 @@ contains
              rtmCTL%runoffocn_nt2(begr:endr),     &
              rtmCTL%runofftot_nt1(begr:endr),     &
              rtmCTL%runofftot_nt2(begr:endr),     &
+             rtmCTL%runofftot_nt3(begr:endr),     &
              rtmCTL%runoffdir_nt1(begr:endr),     &
              rtmCTL%runoffdir_nt2(begr:endr),     &
              rtmCTL%volr_nt1(begr:endr),          &
              rtmCTL%volr_nt2(begr:endr),          &
+             rtmCTL%volr_nt3(begr:endr),          &
              rtmCTL%volr_mch(begr:endr),          &
              rtmCTL%dvolrdtlnd_nt1(begr:endr),    &
              rtmCTL%dvolrdtlnd_nt2(begr:endr),    &
@@ -321,6 +326,7 @@ contains
              rtmCTL%dvolrdtocn_nt2(begr:endr),    &
              rtmCTL%qsur_nt1(begr:endr),          &
              rtmCTL%qsur_nt2(begr:endr),          &
+             rtmCTL%qsur_nt3(begr:endr),          &
              rtmCTL%qsub_nt1(begr:endr),          &
              rtmCTL%qsub_nt2(begr:endr),          &
              rtmCTL%qgwl_nt1(begr:endr),          &

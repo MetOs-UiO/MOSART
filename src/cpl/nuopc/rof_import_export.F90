@@ -109,6 +109,7 @@ contains
     !--------------------------------
 
     call fldlist_add(fldsToRof_num, fldsToRof, trim(flds_scalar_name))
+    call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofdom')
     call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofsur')
     call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofgwl')
     call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofsub')
@@ -244,7 +245,7 @@ contains
     type(ESMF_State) :: importState
     integer          :: n,nt
     integer          :: begr, endr
-    integer          :: nliq, nfrz
+    integer          :: nliq, nfrz, ndom
     character(len=*), parameter :: subname='(rof_import_export:import_fields)'
     !---------------------------------------------------------------------------
 
@@ -258,12 +259,14 @@ contains
     ! Set tracers
     nliq = 0
     nfrz = 0
+    ndom = 0
     do nt = 1,nt_rtm
        if (trim(rtm_tracers(nt)) == 'LIQ') nliq = nt
        if (trim(rtm_tracers(nt)) == 'ICE') nfrz = nt
+       if (trim(rtm_tracers(nt)) == 'DOM') ndom = nt
     enddo
-    if (nliq == 0 .or. nfrz == 0) then
-       write(iulog,*) trim(subname),': ERROR in rtm_tracers LIQ ICE ',nliq,nfrz,rtm_tracers
+    if (nliq == 0 .or. nfrz == 0 .or. ndom == 0) then
+       write(iulog,*) trim(subname),': ERROR in rtm_tracers LIQ ICE DOM',nliq,nfrz,ndom,rtm_tracers
        call shr_sys_abort()
     endif
 
@@ -272,6 +275,10 @@ contains
 
     ! determine output array and scale by unit convertsion
     ! NOTE: the call to state_getimport will convert from input kg/m2s to m3/s
+
+    call state_getimport(importState, 'Flrl_rofdom', begr, endr, rtmCTL%area, output=rtmCTL%qsur(:,ndom), &
+         do_area_correction=.true., rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call state_getimport(importState, 'Flrl_rofsur', begr, endr, rtmCTL%area, output=rtmCTL%qsur(:,nliq), &
          do_area_correction=.true., rc=rc)
@@ -316,7 +323,7 @@ contains
     type(ESMF_State)  :: exportState
     integer           :: n,nt
     integer           :: begr,endr
-    integer           :: nliq, nfrz
+    integer           :: nliq, nfrz, ndom
     real(r8), pointer :: rofl(:)
     real(r8), pointer :: rofi(:)
     real(r8), pointer :: flood(:)
@@ -338,12 +345,14 @@ contains
     ! Set tracers
     nliq = 0
     nfrz = 0
+    ndom = 0
     do nt = 1,nt_rtm
        if (trim(rtm_tracers(nt)) == 'LIQ') nliq = nt
        if (trim(rtm_tracers(nt)) == 'ICE') nfrz = nt
+       if (trim(rtm_tracers(nt)) == 'DOM') ndom = nt
     enddo
-    if (nliq == 0 .or. nfrz == 0) then
-       write(iulog,*) trim(subname),': ERROR in rtm_tracers LIQ ICE ',nliq,nfrz,rtm_tracers
+    if (nliq == 0 .or. nfrz == 0 .or. ndom == 0) then
+       write(iulog,*) trim(subname),': ERROR in rtm_tracers LIQ ICE DOM',nliq,nfrz,ndom,rtm_tracers
        call shr_sys_abort()
     endif
 

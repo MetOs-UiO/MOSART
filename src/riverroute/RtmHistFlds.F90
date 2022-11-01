@@ -62,6 +62,10 @@ contains
          avgflag='A', long_name='MOSART total discharge into ocean: '//trim(rtm_tracers(2)), &
          ptr_rof=rtmCTL%runofftot_nt2, default='active')
 
+    call RtmHistAddfld (fname='TOTAL_DISCHARGE_TO_OCEAN'//'_'//trim(rtm_tracers(3)), units='m3/s', &
+         avgflag='A', long_name='MOSART total discharge into ocean: '//trim(rtm_tracers(3)), &
+         ptr_rof=rtmCTL%runofftot_nt3, default='active')
+
     call RtmHistAddfld (fname='DIRECT_DISCHARGE_TO_OCEAN'//'_'//trim(rtm_tracers(1)), units='m3/s', &
          avgflag='A', long_name='MOSART direct discharge into ocean: '//trim(rtm_tracers(1)), &
          ptr_rof=rtmCTL%runoffdir_nt1, default='active')
@@ -77,6 +81,10 @@ contains
     call RtmHistAddfld (fname='STORAGE'//'_'//trim(rtm_tracers(2)), units='m3',  &
          avgflag='A', long_name='MOSART storage: '//trim(rtm_tracers(2)), &
          ptr_rof=rtmCTL%volr_nt2, default='inactive')
+
+    call RtmHistAddfld (fname='STORAGE'//'_'//trim(rtm_tracers(3)), units='m3',  &
+         avgflag='A', long_name='MOSART storage: '//trim(rtm_tracers(3)), &
+         ptr_rof=rtmCTL%volr_nt3, default='active')
 
     call RtmHistAddfld (fname='STORAGE_MCH', units='m3',  &
          avgflag='A', long_name='MOSART main channelstorage', &
@@ -105,6 +113,10 @@ contains
     call RtmHistAddfld (fname='QSUR'//'_'//trim(rtm_tracers(2)), units='m3/s',  &
          avgflag='A', long_name='MOSART input surface runoff: '//trim(rtm_tracers(2)), &
          ptr_rof=rtmCTL%qsur_nt2, default='inactive')
+
+    call RtmHistAddfld (fname='QSUR'//'_'//trim(rtm_tracers(3)), units='m3/s',  &
+         avgflag='A', long_name='MOSART input surface runoff: '//trim(rtm_tracers(3)), &
+         ptr_rof=rtmCTL%qsur_nt3, default='active')
 
     call RtmHistAddfld (fname='QSUB'//'_'//trim(rtm_tracers(1)), units='m3/s',  &
          avgflag='A', long_name='MOSART input subsurface runoff: '//trim(rtm_tracers(1)), &
@@ -157,6 +169,7 @@ contains
 
     rtmCTL%runofftot_nt1(:)  = rtmCTL%runofftot(:,1)
     rtmCTL%runofftot_nt2(:)  = rtmCTL%runofftot(:,2)
+    rtmCTL%runofftot_nt3(:)  = rtmCTL%runofftot(:,3)
 
     rtmCTL%runoffdir_nt1(:)  = rtmCTL%direct(:,1)
     rtmCTL%runoffdir_nt2(:)  = rtmCTL%direct(:,2)
@@ -169,6 +182,7 @@ contains
 
     rtmCTL%volr_nt1(:)       = rtmCTL%volr(:,1)
     rtmCTL%volr_nt2(:)       = rtmCTL%volr(:,2)
+    rtmCTL%volr_nt3(:)       = rtmCTL%volr(:,3)
     rtmCTL%volr_mch(:)       = rtmCTL%wr(:,1)
 
     rtmCTL%qsub_nt1(:)       = rtmCTL%qsub(:,1)
@@ -176,6 +190,7 @@ contains
 
     rtmCTL%qsur_nt1(:)       = rtmCTL%qsur(:,1)
     rtmCTL%qsur_nt2(:)       = rtmCTL%qsur(:,2)
+    rtmCTL%qsur_nt3(:)       = rtmCTL%qsur(:,3)
 
     rtmCTL%qgwl_nt1(:)       = rtmCTL%qgwl(:,1)
     rtmCTL%qgwl_nt2(:)       = rtmCTL%qgwl(:,2)
