@@ -109,12 +109,12 @@ contains
     !--------------------------------
 
     call fldlist_add(fldsToRof_num, fldsToRof, trim(flds_scalar_name))
-    call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofdom')
     call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofsur')
     call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofgwl')
     call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofsub')
     call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofi')
     call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_irrig')
+    call fldlist_add(fldsToRof_num, fldsToRof, 'Flrl_rofdom')
 
     do n = 1,fldsToRof_num
        call NUOPC_Advertise(importState, standardName=fldsToRof(n)%stdname, &
@@ -276,10 +276,6 @@ contains
     ! determine output array and scale by unit convertsion
     ! NOTE: the call to state_getimport will convert from input kg/m2s to m3/s
 
-    call state_getimport(importState, 'Flrl_rofdom', begr, endr, rtmCTL%area, output=rtmCTL%qsur(:,ndom), &
-         do_area_correction=.true., rc=rc)
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-
     call state_getimport(importState, 'Flrl_rofsur', begr, endr, rtmCTL%area, output=rtmCTL%qsur(:,nliq), &
          do_area_correction=.true., rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -297,6 +293,10 @@ contains
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
     call state_getimport(importState, 'Flrl_irrig', begr, endr, rtmCTL%area, output=rtmCTL%qirrig(:), &
+         do_area_correction=.true., rc=rc)
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+
+    call state_getimport(importState, 'Flrl_rofdom', begr, endr, rtmCTL%area, output=rtmCTL%qsur(:,ndom), &
          do_area_correction=.true., rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
