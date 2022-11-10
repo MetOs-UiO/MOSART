@@ -84,8 +84,10 @@ module RunoffMod
      !    - history (currently needed)
      real(r8), pointer :: runofflnd_nt1(:)
      real(r8), pointer :: runofflnd_nt2(:)
+     real(r8), pointer :: runofflnd_nt3(:)
      real(r8), pointer :: runoffocn_nt1(:)
      real(r8), pointer :: runoffocn_nt2(:)
+     real(r8), pointer :: runoffocn_nt3(:)
      real(r8), pointer :: runofftot_nt1(:)
      real(r8), pointer :: runofftot_nt2(:)
      real(r8), pointer :: runofftot_nt3(:)
@@ -104,6 +106,7 @@ module RunoffMod
      real(r8), pointer :: qsur_nt3(:)
      real(r8), pointer :: qsub_nt1(:)
      real(r8), pointer :: qsub_nt2(:)
+     real(r8), pointer :: qsub_nt3(:)
      real(r8), pointer :: qgwl_nt1(:)
      real(r8), pointer :: qgwl_nt2(:)
 
@@ -309,8 +312,10 @@ contains
              rtmCTL%outletg(begr:endr),           &
              rtmCTL%runofflnd_nt1(begr:endr),     &
              rtmCTL%runofflnd_nt2(begr:endr),     &
+             rtmCTL%runofflnd_nt3(begr:endr),     &
              rtmCTL%runoffocn_nt1(begr:endr),     &
              rtmCTL%runoffocn_nt2(begr:endr),     &
+             rtmCTL%runoffocn_nt3(begr:endr),     &
              rtmCTL%runofftot_nt1(begr:endr),     &
              rtmCTL%runofftot_nt2(begr:endr),     &
              rtmCTL%runofftot_nt3(begr:endr),     &
@@ -329,6 +334,7 @@ contains
              rtmCTL%qsur_nt3(begr:endr),          &
              rtmCTL%qsub_nt1(begr:endr),          &
              rtmCTL%qsub_nt2(begr:endr),          &
+             rtmCTL%qsub_nt3(begr:endr),          &
              rtmCTL%qgwl_nt1(begr:endr),          &
              rtmCTL%qgwl_nt2(begr:endr),          &
              rtmCTL%mask(begr:endr),              &
