@@ -20,7 +20,6 @@ MODULE MOSART_physics_mod
   use RtmSpmd       , only : masterproc, mpicom_rof
   use perf_mod      , only: t_startf, t_stopf
   use mct_mod
-  use DommasbMod
 
   implicit none
   private
@@ -52,15 +51,12 @@ MODULE MOSART_physics_mod
     real(r8) :: temp_erout, localDeltaT
     real(r8) :: negchan
     real(r8) :: temp_eroutdom(nt_rtm_dom)
-    real(r8) :: liqsub(rtmCTL%begr:rtmCTL%endr,nt_rtm),concsub(rtmCTL%begr:rtmCTL%endr,nt_rtm_dom)
-    real(r8) :: liqhill(rtmCTL%begr:rtmCTL%endr,nt_rtm),conchill(rtmCTL%begr:rtmCTL%endr,nt_rtm_dom)
+    real(r8) :: liqsub
+    real(r8) :: liqhill
+    real(r8) :: liqmain
     !------------------
     ! hillslope
     !------------------
-    liqsub(:,:)=0._r8
-    concsub(:,:)=0._r8
-    liqhill(:,:)=0._r8
-    conchill(:,:)=0._r8
     
     call t_startf('mosartr_hillslope')
     do nt=1,nt_rtm
@@ -74,31 +70,37 @@ MODULE MOSART_physics_mod
           !-----------------------------------------------------------------------------------------------------------------
           if (nt==1) then ! if LIQ tracer
             do ntdom=1,nt_rtm_dom ! loop over DOM tracers
-              liqhill(iunit,nt)=TRunoff%wh(iunit,nt)-TRunoff%dwh(iunit,nt)*Tctl%DeltaT+TRunoff%qsur(iunit,nt)*Tctl%DeltaT
-              conchill(iunit,ntdom)=(Tdom%domH(iunit,ntdom) + Tdom%domsur(iunit,ntdom) * Tctl%DeltaT)/liqhill(iunit,nt)
-              if (liqhill(iunit,nt)>0._r8 .and. conchill(iunit,ntdom)<=0.3_r8 .and. conchill(iunit,ntdom)>0._r8) then 
-               if (TRunoff%wh(iunit,nt)-TRunoff%dwh(iunit,nt)*Tctl%DeltaT < 0._r8) then
-                  Tdom%domResthill(iunit,ntdom) = Tdom%domResthill(iunit,ntdom) + Tdom%domH(iunit,ntdom)
+         ! 1. Incoming DOM added to DOM pool --> done any way
+               Tdom%domH(iunit,ntdom)=Tdom%domH(iunit,ntdom)+Tdom%domsur(iunit,ntdom)*Tctl%DeltaT   ! (kg/m2)
+         ! 2. Sum up the total amount of water in the pool before outgoing is computed
+               liqhill=TRunoff%wh(iunit,nt)-TRunoff%dwh(iunit,nt)*Tctl%DeltaT+TRunoff%qsur(iunit,nt)*Tctl%DeltaT !(m)
+         ! 3. If there is an outgoing water flux and if there is positive water in the pool
+               if (-TRunoff%ehout(iunit,nt)>=0._r8 .and. liqhill> 0._r8) then 
+         ! 4. Calculate the outgoing DOM based on the fraction of water going out, the fraction cannot be < 0 at this place, but we make sure it is also below 1
+                  if ((-TRunoff%ehout(iunit,nt)*Tctl%DeltaT)/liqhill<=1._r8) then
+                     Tdom%domHout(iunit,ntdom)=max(0._r8,min(1._r8,(-TRunoff%ehout(iunit,nt)*Tctl%DeltaT)/liqhill))*Tdom%domH(iunit,ntdom)/Tctl%DeltaT ! (kg/m2s)
+         ! 5. Update DOM pool by removing outgoing DOM
+                     Tdom%domH(iunit,ntdom)=Tdom%domH(iunit,ntdom)-Tdom%domHout(iunit,ntdom)* Tctl%DeltaT ! (kg/m2)
+         ! 6. In case fraction is larger than 1 meaning too much water leaving and storage becoming negative
+                  else if ((-TRunoff%ehout(iunit,nt)*Tctl%DeltaT)/liqhill>1._r8) then 
+         ! 7. All DOM is moved away then
+                     Tdom%domHout(iunit,ntdom)=Tdom%domH(iunit,ntdom)/Tctl%DeltaT ! (kg/m2s)
+                     Tdom%domH(iunit,ntdom)=0._r8 ! (kg/m2)
+                  endif
+         ! 8. Check if outflow despite negative water available, this happens!!
+               else if (-TRunoff%ehout(iunit,nt)>=0._r8 .and. liqhill <= 0._r8) then
+         ! 9. Then again all DOM is send away
+                  Tdom%domHout(iunit,ntdom)=Tdom%domH(iunit,ntdom)/Tctl%DeltaT ! (kg/m2s)
+                  Tdom%domH(iunit,ntdom)=0._r8 ! (kg/m2)
+         ! 10.Water flowing wrong direction? , don't think this happens
+               else if (-TRunoff%ehout(iunit,nt)<0._r8) then 
+                  write(iulog,*) 'marius inflow',-TRunoff%ehout(iunit,nt),iunit,nt
+               endif
+               if (Tdom%domH(iunit,ntdom)<0._r8) then
                   Tdom%domH(iunit,ntdom)=0._r8
                endif
-                 Tdom%domHout(iunit,ntdom) = -TRunoff%ehout(iunit,nt) * conchill(iunit,ntdom)
-                 Tdom%domH(iunit,ntdom) = Tdom%domH(iunit,ntdom) + (Tdom%domsur(iunit,ntdom) - Tdom%domHout(iunit,ntdom)) * Tctl%DeltaT
-              else if (Tdom%domsur(iunit,ntdom)>0._r8) then
-               Tdom%domResthill(iunit,ntdom)= Tdom%domResthill(iunit,ntdom)+Tdom%domsur(iunit,ntdom)*Tctl%DeltaT
-              endif
-              if (TRunoff%wh(iunit,nt)< 0._r8) then
-               Tdom%domResthill(iunit,ntdom)= Tdom%domResthill(iunit,ntdom)+Tdom%domH(iunit,ntdom)
-               Tdom%domH(iunit,ntdom)=0._r8
-              endif
-              if (Tdom%domH(iunit,ntdom) < 0._r8) then
-               Tdom%domResthill(iunit,ntdom)= Tdom%domResthill(iunit,ntdom)+Tdom%domH(iunit,ntdom)
-               Tdom%domH(iunit,ntdom)=0._r8
-              endif
-              ! here some checks to make sure the DOM is not at too high or low concentrations
-              if (Tdom%domH(iunit,ntdom)/TRunoff%wh(iunit,nt) > 0.3_r8 .and. TRunoff%wh(iunit,nt) >= 0._r8) then 
-                  Tdom%domResthill(iunit,ntdom)= Tdom%domResthill(iunit,ntdom)+Tdom%domH(iunit,ntdom)-0.3*TRunoff%wh(iunit,nt)
-                  Tdom%domH(iunit,ntdom)=0.3*TRunoff%wh(iunit,nt)
-              endif
+         ! 11.Make sure that if water is < 0 , no DOM is present, so move it to the REST variable
+         ! 12.Same if water is >0 but concentration is above 0.3 threshold
               Tdom%domsub(iunit,ntdom)  = Tdom%domsub(iunit,ntdom)  * TUnit%area(iunit) * TUnit%frac(iunit) ! readjust to correct units kg/m2s --> kg/s
               Tdom%domHout(iunit,ntdom) = Tdom%domHout(iunit,ntdom) * TUnit%area(iunit) * TUnit%frac(iunit) ! readjust to correct units kg/m2s --> kg/s
               Tdom%domResthill(iunit,ntdom) = Tdom%domResthill(iunit,ntdom) * TUnit%area(iunit) * TUnit%frac(iunit) ! readjust to correct units kg/m2 --> kg
@@ -148,33 +150,41 @@ MODULE MOSART_physics_mod
                 !----------------------------------------------------------------------------------------------------
                 if (nt==1) then ! if LIQ tracer and there is water
                  do ntdom=1,nt_rtm_dom ! loop over DOM tracers
-                  liqsub(iunit,nt)=TRunoff%wt(iunit,nt)-TRunoff%dwt(iunit,nt)*localDeltaT+TRunoff%etin(iunit,nt)*localDeltaT
-                  concsub(iunit,ntdom)=(Tdom%domT(iunit,ntdom) + (Tdom%domsub(iunit,ntdom)+Tdom%domHout(iunit,ntdom)) * localDeltaT)/liqsub(iunit,nt)
-                  if (liqsub(iunit,nt) > 0._r8 .and. concsub(iunit,ntdom)<=0.3_r8 .and. concsub(iunit,ntdom)>0._r8) then
-                     if (TRunoff%wt(iunit,nt)-TRunoff%dwt(iunit,nt)*localDeltaT< 0._r8) then
-                        Tdom%domRestsubn(iunit,ntdom) = Tdom%domRestsubn(iunit,ntdom) + Tdom%domT(iunit,ntdom)
-                        Tdom%domT(iunit,ntdom)=0._r8
-                     endif
-                     Tdom%domTout(iunit,ntdom) = -TRunoff%etout(iunit,nt)*concsub(iunit,ntdom)
-                     Tdom%domT(iunit,ntdom) = Tdom%domT(iunit,ntdom) + ( Tdom%domsub(iunit,ntdom) + Tdom%domHout(iunit,ntdom) - Tdom%domTout(iunit,ntdom) ) * localDeltaT
-                  else if ((Tdom%domsub(iunit,ntdom)+Tdom%domHout(iunit,ntdom))>0._r8) then
-                     Tdom%domRestsubn(iunit,ntdom)= Tdom%domRestsubn(iunit,ntdom)+(Tdom%domsub(iunit,ntdom)+Tdom%domHout(iunit,ntdom))*localDeltaT
-                  endif
-                  if (TRunoff%wt(iunit,nt) < 0._r8) then
-                     Tdom%domRestsubn(iunit,ntdom)= Tdom%domRestsubn(iunit,ntdom)+Tdom%domT(iunit,ntdom)
-                     Tdom%domT(iunit,ntdom)=0._r8
-                  endif
-                  if (Tdom%domT(iunit,ntdom) < 0._r8) then
-                     Tdom%domRestsubn(iunit,ntdom)=Tdom%domRestsubn(iunit,ntdom)+Tdom%domT(iunit,ntdom)
-                     Tdom%domT(iunit,ntdom)=0._r8
-                  endif
-                  if (Tdom%domT(iunit,ntdom)/TRunoff%wt(iunit,nt) > 0.3_r8 .and. TRunoff%wt(iunit,nt) >= 0._r8)  then
-                     Tdom%domRestsubn(iunit,ntdom)=Tdom%domRestsubn(iunit,ntdom)+Tdom%domT(iunit,ntdom)-0.3*TRunoff%wt(iunit,nt)
-                     Tdom%domT(iunit,ntdom)=0.3*TRunoff%wt(iunit,nt)
-                  endif
+         ! 1. Incoming DOM added to DOM pool --> done any way
+                  Tdom%domT(iunit,ntdom)=Tdom%domT(iunit,ntdom)+(Tdom%domsub(iunit,ntdom)+Tdom%domHout(iunit,ntdom))*localDeltaT   ! (kg)
+         ! 2. Sum up the total amount of water pool before outgoing is computed
+                  liqsub=TRunoff%wt(iunit,nt)-TRunoff%dwt(iunit,nt)*localDeltaT+TRunoff%etin(iunit,nt)*localDeltaT!(m3)
+         ! 3. If there is an outgoing water flux and if there is positive water in the pool
+                        if (-TRunoff%etout(iunit,nt)>=0._r8 .and. liqsub> 0._r8) then 
+         ! 4. Calculate the outgoing DOM based on the fraction of water going out, the fraction cannot be < 0 at this place, but we make sure it is also below 1
+                           if ((-TRunoff%etout(iunit,nt)*localDeltaT)/liqsub<=1._r8) then
+                              Tdom%domTout(iunit,ntdom)=max(0._r8,min(1._r8,(-TRunoff%etout(iunit,nt)*localDeltaT)/liqsub))*Tdom%domT(iunit,ntdom)/localDeltaT ! (kg/s)
+         ! 5. Update DOM pool by removing outgoing DOM
+                              Tdom%domT(iunit,ntdom)=Tdom%domT(iunit,ntdom)-Tdom%domTout(iunit,ntdom)* localDeltaT ! (kg)
+         ! 6. In case fraction is larger than 1 meaning too much water leaving and storage becoming negative
+                           else if ((-TRunoff%etout(iunit,nt)*localDeltaT)/liqsub>1._r8) then 
+         ! 7. All DOM is moved away then
+                              Tdom%domTout(iunit,ntdom)=Tdom%domT(iunit,ntdom)/localDeltaT ! (kg/s)
+                              Tdom%domT(iunit,ntdom)=0._r8                                 ! (kg)
+                           endif
+         ! 8. Check if outflow despite negative water available in pool, this happens!!
+                        else if (-TRunoff%etout(iunit,nt)>=0._r8 .and. liqsub <= 0._r8) then
+         ! 9. Then again all DOM is send away
+                           Tdom%domTout(iunit,ntdom)=Tdom%domT(iunit,ntdom)/localDeltaT ! (kg/s)
+                           Tdom%domT(iunit,ntdom)=0._r8                                 ! (kg)
+         ! 10.Water flowing wrong direction? don't think this happens
+                        else if (-TRunoff%etout(iunit,nt)<0._r8) then 
+                           write(iulog,*) 'marius inflow',-TRunoff%etout(iunit,nt),iunit,nt
+                        endif
+                        if (Tdom%domT(iunit,ntdom)<0._r8) then
+                           Tdom%domT(iunit,ntdom)=0._r8
+                        endif
+         ! 11.Make sure that if water is < 0 , no DOM is present, so move it to the REST variable
+         ! 12.Same if water is >0 but concentration is above 0.3 threshold
                   Tdom%domToutLat(iunit,ntdom) = Tdom%domToutLat(iunit,ntdom) + Tdom%domTout(iunit,ntdom)
                  enddo
                 endif
+                !------------------------------------------------------------------------------------------------------
              end do ! numDT_t
              TRunoff%erlateral(iunit,nt) = TRunoff%erlateral(iunit,nt) / TUnit%numDT_t(iunit)
              TRunoff%erlateral2(iunit,nt) = TRunoff%erlateral2(iunit,nt) + TRunoff%erlateral(iunit,nt)
@@ -274,32 +284,42 @@ MODULE MOSART_physics_mod
                 call UpdateState_mainchannel(iunit,nt)
                 temp_erout = temp_erout + TRunoff%erout(iunit,nt) ! erout here might be inflow to some downstream subbasin, so treat it differently than erlateral
              !-----------------------------------------------------------------------------------------------------------
-             if (nt==1) then ! if LIQ tracer and there is water
-               do ntdom=1,nt_rtm_dom ! loop over DOM tracers
-                  if (TRunoff%wr(iunit,nt)-TRunoff%dwr(iunit,nt)*localDeltaT+(TRunoff%erlateral(iunit,nt)+TRunoff%erin(iunit,nt))*localDeltaT>0._r8) then
-                     if (TRunoff%wr(iunit,nt)-TRunoff%dwr(iunit,nt)*localDeltaT < 0._r8) then
-                        Tdom%domRestmain(iunit,ntdom)= Tdom%domRestmain(iunit,ntdom)+Tdom%domR(iunit,ntdom)
-                        Tdom%domR(iunit,ntdom)=0._r8
-                     endif
-                     call mainchannelRoutingDOM(iunit,nt,ntdom,localDeltaT)
-                     temp_eroutdom(ntdom) = temp_eroutdom(ntdom) + Tdom%domRout(iunit,ntdom)
-                   else if ((Tdom%domRUp(iunit,ntdom)+Tdom%domToutLat(iunit,ntdom))>0._r8) then
-                     Tdom%domRestmain(iunit,ntdom)= Tdom%domRestmain(iunit,ntdom)+(Tdom%domRUp(iunit,ntdom)+Tdom%domToutLat(iunit,ntdom))*localDeltaT
-                   endif
-                   if (Tdom%domR(iunit,ntdom)/TRunoff%wr(iunit,nt) > 0.30001_r8) then !.and. Tdom%domR(iunit,ntdom) < 1.e-10*(Tdom%domRout(iunit,ntdom)+Tdom%domToutLat(iunit,ntdom)+Tdom%domRUp(iunit,ntdom))) then
-                     Tdom%domRestmain(iunit,ntdom)=Tdom%domRestmain(iunit,ntdom)+Tdom%domR(iunit,ntdom)
-                     Tdom%domR(iunit,ntdom)=0._r8
-                   endif
-                   if (Tdom%domR(iunit,ntdom) < 1.e-50_r8) then
-                     Tdom%domRestmain(iunit,ntdom)=Tdom%domRestmain(iunit,ntdom)+Tdom%domR(iunit,ntdom)
-                     Tdom%domR(iunit,ntdom)=0._r8
-                    endif
-                   !if (Tdom%domR(iunit,ntdom)/TRunoff%wr(iunit,nt) > 0.30001_r8 .or. Tdom%domR(iunit,ntdom) <0._r8) then
-                   !   write(iulog,*)' Concentration in main is too high or too low ',Tdom%domR(iunit,ntdom),TRunoff%wr(iunit,nt)
-                      !call shr_sys_abort('Concentration in main is too high or too low')
-                   !endif
-               enddo
-             endif
+                if (nt==1) then ! if LIQ tracer and there is water
+                  do ntdom=1,nt_rtm_dom ! loop over DOM tracers
+         ! 1. Incoming DOM added to DOM pool --> done any way
+                  Tdom%domR(iunit,ntdom)=Tdom%domR(iunit,ntdom)+(Tdom%domRUp(iunit,ntdom)+Tdom%domToutLat(iunit,ntdom))*localDeltaT  ! (kg)
+         ! 2. Sum up the total amount of water pool before outgoing is computed
+                  liqmain=TRunoff%wr(iunit,nt)-TRunoff%dwr(iunit,nt)*localDeltaT+(TRunoff%erlateral(iunit,nt)+TRunoff%erin(iunit,nt))*localDeltaT !(m3)
+         ! 3. If there is an outgoing water flux and if there is positive water in the pool
+                        if (-TRunoff%erout(iunit,nt)>=0._r8 .and. liqmain> 0._r8) then 
+         ! 4. Calculate the outgoing DOM based on the fraction of water going out, the fraction cannot be < 0 at this place, but we make sure it is also below 1
+                           if ((-TRunoff%erout(iunit,nt)*localDeltaT)/liqmain<=1._r8) then
+                              Tdom%domRout(iunit,ntdom)=max(0._r8,min(1._r8,(-TRunoff%erout(iunit,nt)*localDeltaT)/liqmain))*Tdom%domR(iunit,ntdom)/localDeltaT ! (kg/s)
+         ! 5. Update DOM pool by removing outgoing DOM
+                              Tdom%domR(iunit,ntdom)=Tdom%domR(iunit,ntdom)-Tdom%domRout(iunit,ntdom)* localDeltaT ! (kg)
+         ! 6. In case fraction is larger than 1 meaning too much water leaving and storage becoming negative
+                           else if ((-TRunoff%erout(iunit,nt)*localDeltaT)/liqmain>1._r8) then 
+         ! 7. All DOM is moved away then
+                              Tdom%domRout(iunit,ntdom)=Tdom%domR(iunit,ntdom)/localDeltaT ! (kg/s)
+                              Tdom%domR(iunit,ntdom)=0._r8                                 ! (kg)
+                           endif
+         ! 8. Check if outflow despite negative water available in pool, this happens!!
+                        else if (-TRunoff%erout(iunit,nt)>=0._r8 .and. liqmain <= 0._r8) then
+         ! 9. Then again all DOM is send away
+                           Tdom%domRout(iunit,ntdom)=Tdom%domR(iunit,ntdom)/localDeltaT ! (kg/s)
+                           Tdom%domR(iunit,ntdom)=0._r8                                 ! (kg)
+         ! 10.Water flowing wrong direction? don't think this happens
+                        else if (-TRunoff%erout(iunit,nt)<0._r8) then 
+                           write(iulog,*) 'marius inflow',-TRunoff%erout(iunit,nt),iunit,nt
+                        endif
+                        if (Tdom%domR(iunit,ntdom)<0._r8) then
+                           Tdom%domR(iunit,ntdom)=0._r8
+                        endif
+         ! 11.Make sure that if water is < 0 , no DOM is present, so move it to the REST variable
+         ! 12.Same if water is >0 but concentration is above 0.3 threshold
+                  temp_eroutdom(ntdom) = temp_eroutdom(ntdom) + Tdom%domRout(iunit,ntdom)
+                  enddo
+                endif
              !----------------------------------------------------------------------------------------------------------------
              end do
              temp_erout = temp_erout / TUnit%numDT_r(iunit)
